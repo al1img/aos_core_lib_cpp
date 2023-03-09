@@ -37,6 +37,21 @@ constexpr auto cInstanceIDLen = AOS_CONFIG_TYPES_INSTANCE_ID_LEN;
 constexpr auto cFilePathLen = AOS_CONFIG_TYPES_FILE_PATH_LEN;
 
 /**
+ * Max number of instances.
+ */
+constexpr auto cMaxNumInstances = AOS_CONFIG_TYPES_MAX_NUM_INSTANCES;
+
+/**
+ * Max number of services.
+ */
+constexpr auto cMaxNumServices = AOS_CONFIG_TYPES_MAX_NUM_SERVICES;
+
+/**
+ * Max number of layers.
+ */
+constexpr auto cMaxNumLayers = AOS_CONFIG_TYPES_MAX_NUM_LAYERS;
+
+/**
  * Instance identification.
  */
 struct InstanceIdent {
