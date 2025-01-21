@@ -1,0 +1,10 @@
+1. Service permissions + secret env var                                         DONE
+2. Override env envVar
+3. Allocate devices and devices alert                                           DONE
+4. Runtime service instances status
+5. Unit tests
+6. Stop instances on stop launcher                                              DONE
+7. Create etc in mount points and fill other network params (CreateNetworkDir)  DONE
+8. Update spec to OCI 1.2.0                                                     DONE
+9. Check umount on start should not retry                                       DONE
+10. Stop on start should not return error                                       DONE
