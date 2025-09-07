@@ -1891,6 +1891,30 @@ public:
 using UpdateItemTypeEnum = UpdateItemTypeType::Enum;
 using UpdateItemType     = EnumStringer<UpdateItemTypeType>;
 
+/**
+ * State result type.
+ */
+class StateResultType {
+public:
+    enum class Enum {
+        eAccepted,
+        eRejected,
+    };
+
+    static const Array<const char* const> GetStrings()
+    {
+        static const char* const sStrings[] = {
+            "accepted",
+            "rejected",
+        };
+
+        return Array<const char* const>(sStrings, ArraySize(sStrings));
+    };
+};
+
+using StateResultEnum = StateResultType::Enum;
+using StateResult     = EnumStringer<StateResultType>;
+
 } // namespace aos
 
 #endif
