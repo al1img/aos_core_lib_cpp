@@ -109,6 +109,7 @@ private:
     Error FinalizeUpdate();
     Error CancelDownload();
     void  StartUpdate();
+    void  CancelUpdate();
 
     iamclient::NodeHandlerItf*     mNodeHandler {};
     unitconfig::UnitConfigItf*     mUnitConfig {};
@@ -124,6 +125,7 @@ private:
 
     bool        mIsRunning {};
     bool        mHasPendingDesiredStatus {};
+    bool        mCancelCurrentUpdate {};
     UpdateState mUpdateState {};
 
     StaticAllocator<cAllocatorSize> mAllocator {};
