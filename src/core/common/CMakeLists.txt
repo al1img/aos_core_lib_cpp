@@ -31,7 +31,9 @@ set(INSTALL_HEADERS
     aos_core_common_version
 )
 
-set(INSTALL_LIBRARIES aos_core_common_crypto aos_core_common_monitoring aos_core_common_pkcs11 aos_core_common_tools)
+set(INSTALL_LIBRARIES aos_core_common_crypto aos_core_common_monitoring aos_core_common_pkcs11
+                      aos_core_common_statushandler aos_core_common_tools
+)
 
 if(WITH_TEST)
     list(APPEND INSTALL_HEADERS aos_core_common_tests_mocks aos_core_common_tests_stubs)
@@ -68,6 +70,7 @@ add_subdirectory(nodeconfig)
 add_subdirectory(ocispec)
 add_subdirectory(pkcs11)
 add_subdirectory(spaceallocator)
+add_subdirectory(statushandler)
 add_subdirectory(tools)
 add_subdirectory(types)
 add_subdirectory(version)
