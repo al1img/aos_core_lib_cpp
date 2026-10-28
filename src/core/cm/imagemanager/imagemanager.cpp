@@ -1150,6 +1150,10 @@ Error ImageManager::EnsureBlob(const String& digest, const String& downloadPath,
             return AOS_ERROR_WRAP(err);
         }
 
+        if (!blobInfo->mSHA256.HasValue()) {
+            break;
+        }
+
         fs::FileInfo downloadFileInfo;
 
         if (auto err = mFileInfoProvider->GetFileInfo(downloadPath, downloadFileInfo, crypto::HashEnum::eSHA3_256);
@@ -1157,7 +1161,7 @@ Error ImageManager::EnsureBlob(const String& digest, const String& downloadPath,
             return AOS_ERROR_WRAP(err);
         }
 
-        if (downloadFileInfo.mCheckSum == blobInfo->mSHA256) {
+        if (downloadFileInfo.mCheckSum == *blobInfo->mSHA256) {
             break;
         }
 

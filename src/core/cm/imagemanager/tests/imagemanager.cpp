@@ -101,8 +101,10 @@ protected:
                 info.mDecryptInfo.EmplaceValue();
                 info.mSignInfo.EmplaceValue();
 
+                info.mSHA256.EmplaceValue();
+
                 for (size_t i = 0; i < crypto::cSHA256Size; i++) {
-                    info.mSHA256.PushBack(static_cast<uint8_t>(i));
+                    info.mSHA256->PushBack(static_cast<uint8_t>(i));
                 }
 
                 blobsInfo.PushBack(info);
@@ -292,8 +294,10 @@ TEST_F(ImageManagerTest, DownloadUpdateItems_Success_NewItem)
             info.mDecryptInfo.EmplaceValue();
             info.mSignInfo.EmplaceValue();
 
+            info.mSHA256.EmplaceValue();
+
             for (size_t i = 0; i < crypto::cSHA256Size; i++) {
-                info.mSHA256.PushBack(static_cast<uint8_t>(i));
+                info.mSHA256->PushBack(static_cast<uint8_t>(i));
             }
 
             blobsInfo.PushBack(info);
@@ -422,8 +426,10 @@ TEST_F(ImageManagerTest, DownloadUpdateItems_AlreadyInstalled)
             info.mDecryptInfo.EmplaceValue();
             info.mSignInfo.EmplaceValue();
 
+            info.mSHA256.EmplaceValue();
+
             for (size_t i = 0; i < crypto::cSHA256Size; i++) {
-                info.mSHA256.PushBack(static_cast<uint8_t>(i));
+                info.mSHA256->PushBack(static_cast<uint8_t>(i));
             }
 
             blobsInfo.PushBack(info);
@@ -610,7 +616,8 @@ TEST_F(ImageManagerTest, DownloadUpdateItems_MultipleItems_Success)
 
                 auto [colonPos, findErr] = digest.FindSubstr(0, ":");
                 String hash(digest.CStr() + colonPos + 1);
-                hash.HexToByteArray(info.mSHA256);
+                info.mSHA256.EmplaceValue();
+                hash.HexToByteArray(*info.mSHA256);
 
                 blobsInfo.PushBack(info);
             }
@@ -760,8 +767,10 @@ TEST_F(ImageManagerTest, DownloadUpdateItems_Cancel_DownloadFailed)
                 info.mDecryptInfo.EmplaceValue();
                 info.mSignInfo.EmplaceValue();
 
+                info.mSHA256.EmplaceValue();
+
                 for (size_t i = 0; i < crypto::cSHA256Size; i++) {
-                    info.mSHA256.PushBack(static_cast<uint8_t>(i));
+                    info.mSHA256->PushBack(static_cast<uint8_t>(i));
                 }
 
                 blobsInfo.PushBack(info);
@@ -840,8 +849,10 @@ TEST_F(ImageManagerTest, DownloadUpdateItems_UnencryptedBlob_CopiesToInstall)
             info.mSize   = cBlobSize;
             info.mURLs.PushBack("http://test.com/blob");
             info.mSignInfo.EmplaceValue();
+            info.mSHA256.EmplaceValue();
+
             for (size_t i = 0; i < crypto::cSHA256Size; i++) {
-                info.mSHA256.PushBack(static_cast<uint8_t>(i));
+                info.mSHA256->PushBack(static_cast<uint8_t>(i));
             }
 
             return blobsInfo.PushBack(info);
@@ -1221,8 +1232,10 @@ TEST_F(ImageManagerTest, DownloadUpdateItems_RemovesOldPendingVersion)
             info.mDecryptInfo.EmplaceValue();
             info.mSignInfo.EmplaceValue();
 
+            info.mSHA256.EmplaceValue();
+
             for (size_t i = 0; i < crypto::cSHA256Size; i++) {
-                info.mSHA256.PushBack(static_cast<uint8_t>(i));
+                info.mSHA256->PushBack(static_cast<uint8_t>(i));
             }
 
             blobsInfo.PushBack(info);
@@ -1342,8 +1355,10 @@ TEST_F(ImageManagerTest, DownloadUpdateItems_RemovesOldFailedVersion)
             info.mDecryptInfo.EmplaceValue();
             info.mSignInfo.EmplaceValue();
 
+            info.mSHA256.EmplaceValue();
+
             for (size_t i = 0; i < crypto::cSHA256Size; i++) {
-                info.mSHA256.PushBack(static_cast<uint8_t>(i));
+                info.mSHA256->PushBack(static_cast<uint8_t>(i));
             }
 
             blobsInfo.PushBack(info);
@@ -1484,8 +1499,10 @@ TEST_F(ImageManagerTest, DownloadUpdateItems_RemovesExcessRemovedVersion)
             info.mDecryptInfo.EmplaceValue();
             info.mSignInfo.EmplaceValue();
 
+            info.mSHA256.EmplaceValue();
+
             for (size_t i = 0; i < crypto::cSHA256Size; i++) {
-                info.mSHA256.PushBack(static_cast<uint8_t>(i));
+                info.mSHA256->PushBack(static_cast<uint8_t>(i));
             }
 
             blobsInfo.PushBack(info);

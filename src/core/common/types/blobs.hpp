@@ -18,12 +18,12 @@ namespace aos {
  * Blob info.
  */
 struct BlobInfo {
-    StaticString<oci::cDigestLen>                   mDigest;
-    StaticArray<StaticString<cURLLen>, cMaxNumURLs> mURLs;
-    StaticArray<uint8_t, crypto::cSHA256Size>       mSHA256;
-    size_t                                          mSize {};
-    Optional<crypto::DecryptInfo>                   mDecryptInfo;
-    Optional<crypto::SignInfo>                      mSignInfo;
+    StaticString<oci::cDigestLen>                       mDigest;
+    StaticArray<StaticString<cURLLen>, cMaxNumURLs>     mURLs;
+    Optional<StaticArray<uint8_t, crypto::cSHA256Size>> mSHA256;
+    size_t                                              mSize {};
+    Optional<crypto::DecryptInfo>                       mDecryptInfo;
+    Optional<crypto::SignInfo>                          mSignInfo;
 
     /**
      * Compares blob info.
