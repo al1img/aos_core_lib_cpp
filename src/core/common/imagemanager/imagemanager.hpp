@@ -10,8 +10,8 @@
 #include <core/common/consts.hpp>
 #include <core/common/ocispec/itf/ocispec.hpp>
 #include <core/common/spaceallocator/itf/spaceallocator.hpp>
-#include <core/common/tools/array.hpp>
 #include <core/common/tools/fs.hpp>
+#include <core/common/tools/list.hpp>
 #include <core/common/tools/memory.hpp>
 #include <core/common/tools/noncopyable.hpp>
 #include <core/common/tools/thread.hpp>
@@ -126,6 +126,7 @@ protected:
      * same time, plus one StaticArray<DeployableItemInfo, cMaxNumStoredItems> for GetItemsStatuses.
      *
      * @param config image manager config.
+     * @param downloadBlobInfoProvider download blob info provider.
      * @param storage image manager storage.
      * @param spaceAllocator space allocator.
      * @param fileInfoProvider file info provider.
@@ -134,9 +135,9 @@ protected:
      * @param allocator allocator for temporary objects.
      * @return Error.
      */
-    Error Init(const Config& config, StorageItf& storage, spaceallocator::SpaceAllocatorItf& spaceAllocator,
-        fs::FileInfoProviderItf& fileInfoProvider, oci::OCISpecItf& ociSpec, fs::FSPlatformItf& fsPlatform,
-        AllocatorItf& allocator);
+    Error Init(const Config& config, DownloadBlobInfoProviderItf& downloadBlobInfoProvider, StorageItf& storage,
+        spaceallocator::SpaceAllocatorItf& spaceAllocator, fs::FileInfoProviderItf& fileInfoProvider,
+        oci::OCISpecItf& ociSpec, fs::FSPlatformItf& fsPlatform, AllocatorItf& allocator);
 
     /**
      * Installs item. Waits while the same item version is being installed or removed, or while
@@ -169,60 +170,12 @@ protected:
     Error RemoveItem(const String& itemID, const String& version);
 
     /**
-     * Validates blob.
-     *
-     * @param digest blob digest.
-     * @param path blob path.
-     * @return Error: eInvalidArgument if digest is malformed, eNotSupported if digest algorithm is not sha256,
-     * eInvalidChecksum if blob checksum mismatches, the file info provider error if the blob file can't be read.
-     */
-    Error ValidateBlob(const String& digest, const String& path) const;
-
-    /**
-     * Installs blob for the item. Locks the blob and stores the blob reference for the item. If the blob already
-     * exists and is valid, keeps it. Otherwise removes the existing blob, allocates space of the blob size if it is
-     * not 0, downloads and validates the blob. On failure, the blob file is removed and the space is released.
-     * Derived classes must use this method to download blobs, e.g. from InstallLayer.
-     *
-     * @param itemInfo item info.
-     * @param blob item blob info.
-     * @param size blob size, 0 if unknown.
-     * @return Error.
-     */
-    Error InstallBlob(const InstallItemInfo& itemInfo, const ItemBlobInfo& blob, size_t size);
-
-    /**
      * Removes blob. Doesn't call the space allocator: the caller frees the returned size.
      *
      * @param digest blob digest.
      * @param path blob path.
      * @return RetWithError<size_t>: freed size, 0 if the blob doesn't exist.
      */
-    RetWithError<size_t> RemoveBlob(const String& digest, const String& path);
-
-    /**
-     * Installs layer of the item. Called by InstallItem for every layer. The default implementation calls InstallBlob.
-     * Derived classes must call InstallBlob to download the layer blob.
-     *
-     * @param itemInfo item info.
-     * @param descriptor layer descriptor.
-     * @param diffDigest diff digest, empty if item has no image config.
-     * @return Error.
-     */
-    virtual Error InstallLayer(
-        const InstallItemInfo& itemInfo, const oci::ContentDescriptor& descriptor, const String& diffDigest);
-
-    /**
-     * Removes layer.
-     *
-     * @param digest layer blob digest.
-     * @param mediaType layer media type.
-     * @param diffID layer diff ID, empty if item has no image config.
-     * @param path layer blob path.
-     * @return RetWithError<size_t>: freed size.
-     */
-    virtual RetWithError<size_t> RemoveLayer(
-        const String& digest, const String& mediaType, const String& diffID, const String& path);
 
     /**
      * Returns space allocator.
@@ -232,34 +185,66 @@ protected:
     spaceallocator::SpaceAllocatorItf& GetSpaceAllocator() const { return *mSpaceAllocator; }
 
 private:
-    static constexpr auto cBlobsFolder           = "blobs";
-    static constexpr auto cSHA256DigestAlgorithm = "sha256";
-    static constexpr auto cBlobHashSize          = crypto::cSHA512Size;
-    static constexpr auto cMaxNumListeners       = 4;
-    static constexpr auto cMaxNumBlobsInProgress = cMaxNumConcurrentItems + 2;
-
-    struct ItemInProgress {
-        StaticString<cIDLen>      mItemID;
-        StaticString<cVersionLen> mVersion;
-        UpdateItemType            mType;
-        bool                      mNotified {};
-        ItemStateEnum             mState {};
-    };
-
-    struct BlobInProgress {
-        StaticString<oci::cDigestLen> mDigest;
-        StaticString<cIDLen>          mItemID;
-        StaticString<cVersionLen>     mVersion;
-    };
+    static constexpr auto cBlobsFolder       = "blobs";
+    static constexpr auto cBlobHashSize      = Max(crypto::cSHA256Size, crypto::cSHA512Size);
+    static constexpr auto cMaxNumListeners   = 4;
+    static constexpr auto cMaxNumStoredItems = cMaxNumUpdateItems * 2;
+    static constexpr auto cMaxNumItemBlobs   = 1 + oci::cMaxNumManifests * (3 + oci::cMaxNumLayers);
+    static constexpr auto cRetryTimeout      = Time::cSeconds * 2;
 
     /**
      * Downloads blob. Called by InstallBlob, derived classes implement it but must not call it directly.
      *
-     * @param digest blob digest.
      * @param path destination blob path.
+     * @param blobInfo blob information.
      * @return Error.
      */
-    virtual Error DownloadBlob(const String& digest, const String& path) = 0;
+    virtual Error DownloadBlob(const String& path, const BlobInfo& blobInfo) = 0;
+
+    /**
+     * Cancels ongoing blob download.
+     *
+     * @param digest blob digest.
+     * @return Error.
+     */
+    virtual Error CancelDownload(const String& digest) = 0;
+
+    /**
+     * Validates installed layer. Derived classes can also validate unpacked layer data.
+     *
+     * @param path layer blob path.
+     * @param descriptor layer descriptor.
+     * @param diffID diff ID, empty if item has no image config.
+     * @return Error.
+     */
+    virtual Error ValidateLayer(const String& path, const oci::ContentDescriptor& descriptor, const String& diffID);
+
+    /**
+     * Removes installed layer. Derived classes can also remove unpacked layer data.
+     *
+     * @param path layer blob path.
+     * @param descriptor layer descriptor.
+     * @param diffID diff ID, empty if item has no image config.
+     * @return RetWithError<size_t>: freed size, 0 if the layer doesn't exist.
+     */
+    virtual RetWithError<size_t> RemoveLayer(
+        const String& path, const oci::ContentDescriptor& descriptor, const String& diffID)
+    {
+        return 0;
+    }
+
+    /**
+     * Unpacks installed layer. Derived classes can also unpack layer data.
+     *
+     * @param path layer blob path.
+     * @param descriptor layer descriptor.
+     * @param diffID diff ID, empty if item has no image config.
+     * @return Error.
+     */
+    virtual Error UnpackLayer(const String& path, const oci::ContentDescriptor& descriptor, const String& diffID)
+    {
+        return ErrorEnum::eNone;
+    }
 
     class ItemRemover : public spaceallocator::ItemRemoverItf {
     public:
@@ -277,31 +262,48 @@ private:
         ImageManager& mImageManager;
     };
 
-    RetWithError<size_t> RemoveOutdatedItem(const String& itemID, const String& version);
-    void                 FinishInstallBlob(const String& path, spaceallocator::SpaceItf* space, const Error& err);
-    void                 NotifyItemStatusChanged(const UpdateItemStatus& status);
-    void                 NotifyItemRemovedFromCache(const String& itemID, const String& version);
+    Error                ValidateBlob(const String& path, const String& digest, size_t size = 0);
+    Error                GetBlobInfo(const String& digest, BlobInfo& info);
+    Error                DownloadItemBlob(const String& path, const String& digest);
+    RetWithError<size_t> RemoveBlob(const String& path, const String& digest);
+    Error                RemoveItemBlob(
+                       const String& path, const oci::ContentDescriptor& descriptor, bool isLayer = false, const String& diffID = "");
+    Error InstallItemBlob(const String& path, const InstallItemInfo& itemInfo, const oci::ContentDescriptor& descriptor,
+        bool isLayer = false, const String& diffID = "");
+    Error InstallItemBlobs(const InstallItemInfo& itemInfo);
+    Error InstallManifestBlobs(
+        const String& path, const InstallItemInfo& itemInfo, const oci::ContentDescriptor& descriptor);
+    Error StartItemInstall(const InstallItemInfo& itemInfo, DeployableItemInfo& storedInfo);
+    Error AddItemBlob(const String& itemID, const String& version, const oci::ContentDescriptor& descriptor,
+        bool isLayer = false, const String& diffID = "");
 
-    static UpdateItemStatus CreateItemStatus(const String& itemID, UpdateItemType type, const String& version,
+    UpdateItemStatus CreateItemStatus(const String& itemID, UpdateItemType type, const String& version,
         ItemStateEnum state, const Error& error = ErrorEnum::eNone);
+    Error            SetInProgressItemState(
+                   const InstallItemInfo& itemInfo, ItemStateEnum state, const Error& error = ErrorEnum::eNone);
+    Error SetStoredItemState(DeployableItemInfo& item, ItemStateEnum state, const Error& error = ErrorEnum::eNone);
 
-    Error           LockItem(const String& itemID, const String& version);
-    void            UnlockItem(const String& itemID, const String& version);
-    ItemInProgress* FindItemInProgress(const String& itemID, const String& version);
-    Error           LockBlob(const String& digest, const String& itemID, const String& version);
-    bool            TryLockBlob(const String& digest);
-    void            UnlockBlob(const String& digest);
-    BlobInProgress* FindBlobInProgress(const String& digest);
-    Error           StartItemInstall(const InstallItemInfo& itemInfo, DeployableItemInfo& item, bool& wasRemoved);
-    Error           InstallItemBlobs(const InstallItemInfo& itemInfo);
-    Error           InstallManifestBlobs(
-                  const InstallItemInfo& itemInfo, const String& digest, const String& mediaType, size_t size);
-    Error AddItemBlob(const InstallItemInfo& itemInfo, const ItemBlobInfo& blob);
-    Error SetItemState(DeployableItemInfo& item, ItemStateEnum state, const Error& error = ErrorEnum::eNone);
+    RetWithError<size_t> RemoveOutdatedItem(const String& itemID, const String& version);
 
-    static Error ParseDigest(const String& digest, String& algorithm, String& hash);
+    void NotifyItemStatusChanged(const UpdateItemStatus& status);
+    void NotifyItemRemovedFromCache(const String& itemID, const String& version);
+
+    Error             LockItem(const String& itemID, const String& version);
+    void              UnlockItem(const String& itemID, const String& version);
+    UpdateItemStatus* FindInProgressItem(const String& itemID, const String& version);
+    Error             LockBlob(const String& digest);
+    bool              TryLockBlob(const String& digest);
+    void              UnlockBlob(const String& digest);
+
+    bool IsBlobInProgress(const String& digest) const
+    {
+        LockGuard lock {mMutex};
+
+        return mBlobsInProgress.Find(digest) != mBlobsInProgress.end();
+    }
 
     Config                             mConfig;
+    DownloadBlobInfoProviderItf*       mBlobInfoProvider {};
     StorageItf*                        mStorage {};
     spaceallocator::SpaceAllocatorItf* mSpaceAllocator {};
     fs::FileInfoProviderItf*           mFileInfoProvider {};
@@ -312,10 +314,10 @@ private:
     Mutex                                                 mListenersMutex;
     StaticArray<ItemStatusListenerItf*, cMaxNumListeners> mListeners;
 
-    Mutex                                               mMutex;
-    ConditionalVariable                                 mCondVar;
-    StaticArray<ItemInProgress, cMaxNumConcurrentItems> mItemsInProgress;
-    StaticArray<BlobInProgress, cMaxNumBlobsInProgress> mBlobsInProgress;
+    Mutex                                                             mMutex;
+    ConditionalVariable                                               mCondVar;
+    StaticList<UpdateItemStatus, cMaxNumConcurrentItems>              mItemsInProgress;
+    StaticList<StaticString<oci::cDigestLen>, cMaxNumConcurrentItems> mBlobsInProgress;
 
     ItemRemover mItemRemover {*this};
 };

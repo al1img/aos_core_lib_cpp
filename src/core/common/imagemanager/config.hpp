@@ -19,8 +19,8 @@ namespace aos::common::imagemanager {
 struct Config {
     StaticString<cFilePathLen> mImagePath;
     size_t                     mPartLimit {};
-    Duration                   mItemCacheTTL {30 * Time::cDay};
-    Duration                   mRemoveOutdatedPeriod {Time::cDay};
+    Duration                   mItemCacheTTL {};
+    Duration                   mRemoveOutdatedPeriod {};
 };
 
 } // namespace aos::common::imagemanager

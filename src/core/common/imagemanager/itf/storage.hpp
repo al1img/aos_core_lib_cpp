@@ -13,29 +13,11 @@
 namespace aos::common::imagemanager {
 
 /**
- * Maximum number of stored deployable items.
- *
- * @note The maximum number of deployable items is doubled to account for multiple versions of the same item.
- */
-constexpr auto cMaxNumStoredItems = cMaxNumUpdateItems * 2;
-
-/**
- * Maximum number of blobs referenced by deployable item: root index, and manifest, item config, image config and
- * layers of each manifest.
- */
-constexpr auto cMaxNumItemBlobs = 1 + oci::cMaxNumManifests * (3 + oci::cMaxNumLayers);
-
-/**
  * Deployable item info.
  */
-struct DeployableItemInfo {
-    StaticString<cIDLen>          mItemID;
-    UpdateItemType                mType;
-    StaticString<cVersionLen>     mVersion;
+struct DeployableItemInfo : public UpdateItemStatus {
     StaticString<oci::cDigestLen> mRootDigest;
-    ItemState                     mState;
     Time                          mTimestamp;
-    Error                         mError;
 
     /**
      * Compares deployable item info.
@@ -46,9 +28,8 @@ struct DeployableItemInfo {
      */
     friend bool operator==(const DeployableItemInfo& lhs, const DeployableItemInfo& rhs)
     {
-        return lhs.mItemID == rhs.mItemID && lhs.mType == rhs.mType && lhs.mVersion == rhs.mVersion
-            && lhs.mRootDigest == rhs.mRootDigest && lhs.mState == rhs.mState && lhs.mTimestamp == rhs.mTimestamp
-            && lhs.mError == rhs.mError;
+        return (static_cast<const UpdateItemStatus&>(lhs) == static_cast<const UpdateItemStatus&>(rhs))
+            && lhs.mRootDigest == rhs.mRootDigest && lhs.mTimestamp == rhs.mTimestamp;
     }
 
     /**
@@ -64,11 +45,9 @@ struct DeployableItemInfo {
 /**
  * Item blob info.
  */
-struct ItemBlobInfo {
-    StaticString<oci::cDigestLen>    mDigest;
-    StaticString<oci::cMediaTypeLen> mMediaType;
-    StaticString<oci::cDigestLen>    mDiffID;
-    bool                             mIsLayer {};
+struct ItemBlobInfo : public oci::ContentDescriptor {
+    bool                          mIsLayer {};
+    StaticString<oci::cDigestLen> mDiffID;
 
     /**
      * Compares item blob info.
@@ -79,8 +58,8 @@ struct ItemBlobInfo {
      */
     friend bool operator==(const ItemBlobInfo& lhs, const ItemBlobInfo& rhs)
     {
-        return lhs.mDigest == rhs.mDigest && lhs.mMediaType == rhs.mMediaType && lhs.mDiffID == rhs.mDiffID
-            && lhs.mIsLayer == rhs.mIsLayer;
+        return (static_cast<const oci::ContentDescriptor&>(lhs) == static_cast<const oci::ContentDescriptor&>(rhs))
+            && lhs.mIsLayer == rhs.mIsLayer && lhs.mDiffID == rhs.mDiffID;
     }
 
     /**

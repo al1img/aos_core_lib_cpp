@@ -253,15 +253,15 @@ public:
     Error Remove(const String& itemID, const String& version) { return RemoveItem(itemID, version); }
 
     Error InstallLayer(
-        const InstallItemInfo& itemInfo, const oci::ContentDescriptor& descriptor, const String& diffDigest) override
+        const InstallItemInfo& itemInfo, const oci::ContentDescriptor& descriptor, const String& diffID) override
     {
         {
             std::lock_guard lock {mLayerCallsMutex};
 
-            mInstallLayerCalls.push_back({descriptor.mDigest.CStr(), diffDigest.CStr()});
+            mInstallLayerCalls.push_back({descriptor.mDigest.CStr(), diffID.CStr()});
         }
 
-        return ImageManager::InstallLayer(itemInfo, descriptor, diffDigest);
+        return ImageManager::InstallLayer(itemInfo, descriptor, diffID);
     }
 
     std::vector<LayerCall> GetInstallLayerCalls()
